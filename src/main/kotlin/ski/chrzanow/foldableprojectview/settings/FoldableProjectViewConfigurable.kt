@@ -69,7 +69,7 @@ class FoldableProjectViewConfigurable(private val project: Project) : Searchable
                 )
                         .withSelectedBinding(settings::foldIgnoredFiles.toBinding())
                         .comment(message("foldableProjectView.settings.foldIgnoredFiles.comment"), -1)
-                        .applyToComponent { setMnemonic('h') }
+                        .applyToComponent { setMnemonic('g') }
                         .enableIf(foldingEnabledPredicate)
             }
 
@@ -138,9 +138,9 @@ class FoldableProjectViewConfigurable(private val project: Project) : Searchable
                     withState(FoldableProjectState.fromGraphProperties(
                         foldingEnabledProperty,
                         foldDirectoriesProperty,
+                        foldIgnoredFilesProperty,
                         hideEmptyGroupsProperty,
                         hideAllGroupsProperty,
-                        foldIgnoredFilesProperty,
                         caseInsensitiveProperty,
                         patternsProperty,
                     ))

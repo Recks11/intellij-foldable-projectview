@@ -17,6 +17,7 @@ import com.intellij.openapi.vcs.changes.ignore.lang.Syntax
 import ski.chrzanow.foldableprojectview.settings.FoldableProjectSettings
 import ski.chrzanow.foldableprojectview.settings.FoldableProjectSettingsListener
 import ski.chrzanow.foldableprojectview.settings.FoldableProjectState
+import java.util.Locale
 
 class FoldableTreeStructureProvider(project: Project) : TreeStructureProvider {
 
@@ -63,28 +64,61 @@ class FoldableTreeStructureProvider(project: Project) : TreeStructureProvider {
     } ?: false
 
     private fun MutableCollection<AbstractTreeNode<*>>.match() = this
+        .filter { it.isFileOrDirectory() }
         .filter {
-            when (it) {
-                is PsiDirectoryNode -> state.foldDirectories
-                is PsiFileNode -> true
+            when {
+                it.matchesPattern() -> true
+                state.foldIgnoredFiles -> when {
+                    it.isIgnored() -> true
+                    it.hasNoChildren() -> true
+                    else -> false
+                }
                 else -> false
             }
         }
-        .filter {
+
+    private fun AbstractTreeNode<*>.isFileOrDirectory() = run {
+        when (this) {
+            is PsiDirectoryNode -> state.foldDirectories
+            is PsiFileNode -> true
+            else -> false
+        }
+    }
+
+    private fun AbstractTreeNode<*>.isIgnored() = this.fileStatus.equals(FileStatus.IGNORED)
+
+    /**
+     * Match directories without a file, or containing only ignored files
+     */
+    private fun AbstractTreeNode<*>.hasNoChildren(): Boolean = run {
+        if (this is PsiFileNode) return this.isIgnored()
+        if (this.children.isEmpty()) return true
+        this.children.stream().allMatch {
             when (it) {
-                is ProjectViewNode -> it.virtualFile?.name ?: it.name
-                else -> it.name
-            }.caseInsensitive().let { name ->
-                state.patterns
+                is PsiFileNode -> it.isIgnored()
+                is PsiDirectoryNode -> it.hasNoChildren()
+                else -> true
+            }
+        }
+    }
+
+    private fun AbstractTreeNode<*>.matchesPattern() = run {
+        when (this) {
+            is ProjectViewNode -> this.virtualFile?.name ?: this.name
+            else -> this.name
+        }.caseInsensitive().let { name ->
+            state.patterns
                     .caseInsensitive()
                     .split(' ')
-                    .any { pattern -> patternCache?.createPattern(pattern, Syntax.GLOB)?.matcher(name)?.matches() ?: false }
-            }.or(state.foldIgnoredFiles and(it.fileStatus.equals(FileStatus.IGNORED)))
+                    .any { pattern ->
+                        patternCache?.createPattern(pattern, Syntax.GLOB)?.matcher(name)?.matches() ?: false
+                    }
         }
+    }
 
     private fun String?.caseInsensitive() = when {
         this == null -> ""
-        state.caseInsensitive -> toLowerCase()
+        state.caseInsensitive -> lowercase(Locale.getDefault())
         else -> this
     }
 
